@@ -5,6 +5,8 @@
 import ctypes
 import os
 from ctypes import wintypes
+#module to launch an especific window from a opened app
+import pygetwindow as gw
 
 import winput
     
@@ -21,7 +23,9 @@ except ImportError: # Python 3
     from tkinter import filedialog
     from tkinter import messagebox
     from tkinter import ttk
-    
+
+#module to capture froma a window region
+from PIL import Image, ImageTk, ImageGrab
 
 RECORD_MOVEMENT = True
 
@@ -55,6 +59,14 @@ last_time = 0
 last_flip = time.time()
 options = {}
 screen_res = (800,600)
+
+#angelthz
+#add image variables
+#variable to capture an especific window region
+bbox = (390, 33, 1010, 858)
+#variables to save and show an image file
+image_source = None
+thumbail = None
 
 user32 = ctypes.WinDLL('user32', use_last_error=True)
 
@@ -228,7 +240,13 @@ def createNewMacro(name = None):
 
     if not name:
         name = "Macro #{}".format(len(macros))
-        
+
+    ###code to launch an especific program or app opened in background
+    win = gw.getWindowsWithTitle('LDPlayer(64)')[0]
+    win.activate()    
+    getScreen(name)
+    ###
+
     start_time = time.time()
     last_time = 0
     last_flip = time.time()
@@ -316,6 +334,22 @@ def saveMacros(macros, filename):
     file_.write(file_content)
 
     file_.close()
+
+"""
+angelthz
+function to show a image tumbail in the GUI
+add image save thumbail
+"""
+def getScreen(filename):
+    print("Wait a moment")
+    time.sleep(2)
+    #taking a screenshot from setted region
+    print("Screenshoot taked")
+    sc = ImageGrab.grab(bbox)
+    #saving sc in a image file
+    sc.save(filename+".png")
+    sc.close
+###
 
 def loadMacros(filename):
     global config, IS_LOCKED, button_create_new_macro, button_save_macros, IS_RELATIVE
@@ -444,6 +478,7 @@ def launchGUI():
     global macros, options, IS_LOCKED, button_create_new_macro, button_save_macros, button_choose_stop_recording_key, stop_recording_key, root, screen_res
     root = Tk()
 
+    #screen_res = (root.winfo_screenwidth(), root.winfo_screenheight())
     screen_res = (root.winfo_screenwidth(), root.winfo_screenheight())
 
     options = {"once" : IntVar(), "keyboard" : IntVar(value=1), "mouse": IntVar(value=1), "relative" : IntVar(value=0)}
@@ -454,13 +489,18 @@ def launchGUI():
     root.title("Input Recorder")
     frame = Frame(root)
     scrollbar = ttk.Scrollbar(frame, orient=VERTICAL)
-    listbox = Listbox(frame, yscrollcommand=scrollbar.set, width=20,height=18)
+    listbox = Listbox(frame, yscrollcommand=scrollbar.set, width=30,height=18)
     scrollbar.config(command=listbox.yview)
     scrollbar.pack(side=RIGHT, fill=Y)
     listbox.pack(side=LEFT, fill=BOTH, expand=1)
 
-    frame.grid(row=0,column=0,rowspan=9,sticky=N+S+W+E)
+    image_source = Image.open("blank.png")
+    thumbail = ImageTk.PhotoImage(image_source)
+    img_view = ttk.Label(root, image=thumbail)
+    img_view.grid(row=3,column=3,columnspan=2)
 
+    frame.grid(row=0,column=0,rowspan=9,sticky=N+S+W+E)
+    #------------------------------------------------------------------------------>
     def updateMacroListbox():
         global macros
         a = list(macros)
@@ -470,7 +510,7 @@ def launchGUI():
 
         for macro_name in a:
             listbox.insert(END, macro_name)
-
+    #------------------------------------------------------------------------------>
     canvas_is_recording = Canvas(root, bg = "white", width = 80, height = 80)
     canvas_is_recording.grid(row=8,column=1,columnspan=2)
 
@@ -500,6 +540,8 @@ def launchGUI():
         button_create_new_macro = ttk.Button(root, text = "Add macro", command = createNewMacro_, state=DISABLED)
         button_create_new_macro.grid(row=0,column=2)
     else:
+        ##add getScreen here
+        ###
         button_create_new_macro = ttk.Button(root, text = "Add macro", command = createNewMacro_)
         button_create_new_macro.grid(row=0,column=2)
         checkbuttonKeyboard = ttk.Checkbutton(root, text="Keyboard", variable = options["keyboard"])
@@ -520,10 +562,13 @@ def launchGUI():
             if e or messagebox.askyesno("Are you sure?", "Are you sure you want to delete {}?".format(macro)):
                 macros.pop(macro)
                 listbox.delete(listbox.curselection())
+    
 
+    #------------------------------------------------------------------------------>
     def dialogRunMacro():
         global macros, root
         if listbox.curselection():
+            print("Running: ",listbox.get(listbox.curselection()))
             canvas_is_recording.delete(ALL)
             canvas_is_recording.create_polygon(20,20,60,40,20,60, fill="blue")
             root.update()
@@ -532,6 +577,43 @@ def launchGUI():
             canvas_is_recording.create_rectangle(20,20,60,60, fill = "#161616")
             if IS_LOCKED:
                 deleteMacro(True)
+
+
+    """
+    angelthz
+    function to:
+    add a event function to selected item from listbox
+    """
+    def items_selected(event):
+        """ handle item selected event
+        """
+        # get selected indices
+        selected_item = listbox.get(listbox.curselection())
+        print("Item selected:", selected_item)
+        show_thumbail(selected_item)
+
+    """
+    angelthz
+    function to:
+    add a function to load a new image thumbail that correspond to
+    a selected macro
+    """
+    def show_thumbail(selected_item_name):
+        #-----------------------------------------------------------------
+        # Create a photoimage object of the image in the path
+        image_source2 = Image.open(selected_item_name+".png")
+        thumbail2 = ImageTk.PhotoImage(image_source2)
+        img_view.configure(image=thumbail2)
+        img_view.image=thumbail2
+        #-----------------------------------------------------------------
+
+    """
+    @angelthz
+    line code to:
+    add a event to the macro list from listbox
+    """
+    listbox.bind("<<ListboxSelect>>",items_selected)    
+        
 
     button_run_macro = ttk.Button(root,text = "Run macro", command = dialogRunMacro)
     button_run_macro.grid(row=3,column=1, columnspan=2, sticky=W+E)
